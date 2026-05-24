@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "default-pet",
+  "displayName": "小蓝",
+  "species": "circle",
+  "style": "soft_storybook",
+  "version": "0.1.0",
+  "canvas": {
+    "width": 768,
+    "height": 768,
+    "anchorX": 0.5,
+    "anchorY": 0.0
+  },
+  "defaultScale": 0.5,
+  "actions": {
+    "idle": {
+      "path": "actions/idle",
+      "fps": 8,
+      "loop": true,
+      "required": true,
+      "fallback": null
+    },
+    "walk": {
+      "path": "actions/walk",
+      "fps": 8,
+      "loop": true,
+      "required": false,
+      "fallback": "idle"
+    },
+    "tap_happy": {
+      "path": "actions/tap_happy",
+      "fps": 8,
+      "loop": false,
+      "required": false,
+      "fallback": "idle"
+    },
+    "dragged": {
+      "path": "actions/dragged",
+      "fps": 8,
+      "loop": true,
+      "required": false,
+      "fallback": "idle"
+    },
+    "rest": {
+      "path": "actions/rest",
+      "fps": 4,
+      "loop": true,
+      "required": false,
+      "fallback": "idle"
+    }
+  }
+}

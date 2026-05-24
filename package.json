@@ -1,0 +1,29 @@
+{
+  "name": "desktop-pet-electron",
+  "version": "0.1.0",
+  "private": false,
+  "description": "A local Electron desktop pet that plays DesktopPet PetPack assets.",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/petpack.js && node --check electron/store.js && node --check electron/renderer/renderer.js && node --check electron/settings/settings.js && node --check scripts/validate_petpack.mjs && node --check scripts/analyze_petpack_assets.mjs && node --check scripts/generate_yuanbao_petpack_v2.mjs",
+    "validate": "node scripts/validate_petpack.mjs Yuanbao.petpack && node scripts/validate_petpack.mjs Resources/DefaultPetPack",
+    "analyze:yuanbao": "node scripts/analyze_petpack_assets.mjs Yuanbao.petpack",
+    "generate:yuanbao": "node scripts/generate_yuanbao_petpack_v2.mjs",
+    "generate:yuanbao-v2": "node scripts/generate_yuanbao_petpack_v2.mjs \"$YUANBAO_SOURCE_DIR\" Yuanbao_v2.petpack",
+    "analyze:yuanbao-v2": "node scripts/analyze_petpack_assets.mjs Yuanbao_v2.petpack",
+    "validate:default": "node scripts/validate_petpack.mjs Resources/DefaultPetPack",
+    "validate:yuanbao": "node scripts/validate_petpack.mjs Yuanbao.petpack",
+    "validate:yuanbao-v2": "node scripts/validate_petpack.mjs Yuanbao_v2.petpack",
+    "preview:default": "python3 scripts/debug_petpack_preview.py Resources/DefaultPetPack",
+    "preview:yuanbao": "python3 scripts/debug_petpack_preview.py Yuanbao.petpack"
+  },
+  "devDependencies": {
+    "electron": "^42.2.0"
+  }
+}

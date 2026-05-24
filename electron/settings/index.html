@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Desktop Pet Settings</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="panel">
+    <div class="header">
+      <div>
+        <div id="pack-name" class="pack-name">Desktop Pet</div>
+        <div class="label">大小</div>
+      </div>
+      <div id="scale-value" class="value">67%</div>
+    </div>
+    <input id="scale-slider" type="range" min="35" max="110" step="5" value="67" aria-label="宠物大小">
+    <div class="footer">
+      <span>小</span>
+      <button id="reset-button" type="button">默认</button>
+      <span>大</span>
+    </div>
+  </main>
+  <script src="./settings.js"></script>
+</body>
+</html>

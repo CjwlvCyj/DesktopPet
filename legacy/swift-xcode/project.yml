@@ -1,0 +1,37 @@
+name: DesktopPet
+options:
+  bundleIdPrefix: com.desktoppet
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+
+targets:
+  DesktopPet:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+    resources:
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_NAME: DesktopPet
+        PRODUCT_BUNDLE_IDENTIFIER: com.desktoppet.app
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_LSUIElement: true
+        INFOPLIST_KEY_CFBundleDisplayName: "Desktop Pet"
+    dependencies:
+      - sdk: SpriteKit.framework
+      - sdk: ServiceManagement.framework
+
+  DesktopPetTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: DesktopPet
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.desktoppet.tests

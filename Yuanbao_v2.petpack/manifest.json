@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "yuanbao-cat-v2",
+  "displayName": "元宝 v2",
+  "species": "cat",
+  "style": "soft_storybook_multi_pose",
+  "version": "0.2.0",
+  "canvas": {
+    "width": 768,
+    "height": 768,
+    "anchorX": 0.5,
+    "anchorY": 0
+  },
+  "defaultScale": 0.67,
+  "actions": {
+    "idle": {
+      "path": "actions/idle",
+      "fps": 8,
+      "loop": true,
+      "required": true,
+      "fallback": null
+    },
+    "walk": {
+      "path": "actions/walk",
+      "fps": 10,
+      "loop": true,
+      "required": false,
+      "fallback": "idle"
+    },
+    "tap_happy": {
+      "path": "actions/tap_happy",
+      "fps": 12,
+      "loop": false,
+      "required": false,
+      "fallback": "idle"
+    },
+    "dragged": {
+      "path": "actions/dragged",
+      "fps": 8,
+      "loop": true,
+      "required": false,
+      "fallback": "idle"
+    },
+    "rest": {
+      "path": "actions/rest",
+      "fps": 4,
+      "loop": true,
+      "required": false,
+      "fallback": "idle"
+    }
+  }
+}

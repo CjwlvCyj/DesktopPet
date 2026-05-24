@@ -1,0 +1,5 @@
+Source: Automatically generated placeholder assets for DesktopPet.
+Author: DesktopPet development tooling
+Process: Generated programmatically using Python and Pillow to create smooth SVG-like circle animations.
+Usage: Intended solely for local development and beta testing of the DesktopPet application.
+Distribution: Restricted. Do not distribute without permission.

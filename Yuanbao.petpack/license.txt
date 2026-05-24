@@ -1,0 +1,9 @@
+Yuanbao PetPack v0.4.0
+
+Reference photos: provided by the user for this DesktopPet beta.
+Generated pose sources: local AI-generated multi-pose Yuanbao images.
+Walk key pose sources: left and right walk key pose sheets generated from Yuanbao references. Right-facing poses prioritize the user-provided real photo markings.
+Frame process: local Node.js PNG processing, green-screen removal, pose fitting, key-pose sequencing, and light motion pass.
+Original photos: not included in this PetPack.
+Usage: intended only for local DesktopPet beta testing.
+Redistribution: do not redistribute generated assets or source references without the user's permission.
