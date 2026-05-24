@@ -4,7 +4,7 @@
   "displayName": "元宝",
   "species": "cat",
   "style": "soft_storybook_multi_pose",
-  "version": "0.4.0",
+  "version": "0.5.6",
   "canvas": {
     "width": 768,
     "height": 768,
@@ -19,6 +19,20 @@
       "loop": true,
       "required": true,
       "fallback": null
+    },
+    "idle_yawn": {
+      "path": "actions/idle_yawn",
+      "fps": 8,
+      "loop": false,
+      "required": false,
+      "fallback": "idle"
+    },
+    "idle_spin": {
+      "path": "actions/idle_spin",
+      "fps": 8,
+      "loop": false,
+      "required": false,
+      "fallback": "idle"
     },
     "walk": {
       "path": "actions/walk",

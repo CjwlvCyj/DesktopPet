@@ -9,15 +9,20 @@ const PNG_SIGNATURE = '89504e470d0a1a0a';
 const CANVAS = 768;
 const DEFAULT_SOURCE_DIR = process.env.YUANBAO_SOURCE_DIR || '';
 const WALK_KEYPOSE_PHASES = [0, 0.25, 0.5, 0.75];
+const IDLE_SPIN_KEY_COUNT = 10;
+const POSE_SOURCE = poseSourceConfig();
+const POSE_OVERRIDE_SOURCE = poseOverrideSourceConfig();
+const IDLE_VARIANT_SOURCE = idleVariantSourceConfig();
+const IDLE_SPIN_SOURCE = idleSpinSourceConfig();
 const WALK_LEFT_SOURCE = walkSourceConfig({
   dirName: 'yuanbao_walk_keyposes',
-  sheetName: 'generated_walk_sheet_v1.png',
+  sheetName: 'generated_walk_sheet_v5.png',
   keyPrefix: 'walk_key',
   direction: 'left'
 });
 const WALK_RIGHT_SOURCE = walkSourceConfig({
   dirName: 'yuanbao_walk_right_keyposes',
-  sheetName: 'generated_walk_right_sheet_v1.png',
+  sheetName: 'generated_walk_right_sheet_v2.png',
   keyPrefix: 'walk_right_key',
   direction: 'right'
 });
@@ -34,12 +39,97 @@ function walkSourceConfig({ dirName, sheetName, keyPrefix, direction }) {
   };
 }
 
+function poseSourceConfig() {
+  const dir = path.resolve('asset_sources', 'yuanbao_pose_sources');
+  const entries = [
+    ['idle', 'yuanbao_idle_source.png'],
+    ['tap_happy', 'yuanbao_tap_happy_source.png'],
+    ['dragged', 'yuanbao_dragged_source.png'],
+    ['rest', 'yuanbao_rest_source.png'],
+    ['walk', 'yuanbao_walk_base_source.png']
+  ];
+  return {
+    dir,
+    sheetPath: path.join(dir, 'generated_pose_sheet_v2.png'),
+    sheetName: 'generated_pose_sheet_v2.png',
+    entries,
+    files: Object.fromEntries(entries.map(([name, file]) => [name, path.join(dir, file)]))
+  };
+}
+
+function poseOverrideSourceConfig() {
+  const dir = path.resolve('asset_sources', 'yuanbao_pose_sources');
+  const entries = [
+    ['dragged', 'yuanbao_dragged_source.png'],
+    ['rest', 'yuanbao_rest_source.png']
+  ];
+  return {
+    dir,
+    sheetPath: path.join(dir, 'generated_dragged_rest_sheet_v1.png'),
+    sheetName: 'generated_dragged_rest_sheet_v1.png',
+    entries,
+    files: Object.fromEntries(entries.map(([name, file]) => [name, path.join(dir, file)]))
+  };
+}
+
+function idleVariantSourceConfig() {
+  const dir = path.resolve('asset_sources', 'yuanbao_pose_sources');
+  const entries = [
+    ['idle_yawn', 'yuanbao_idle_yawn_source.png', 'idle_yawn']
+  ];
+  return {
+    dir,
+    sheetPath: path.join(dir, 'generated_idle_variants_rest_sheet_v1.png'),
+    sheetName: 'generated_idle_variants_rest_sheet_v1.png',
+    sheetCellCount: 6,
+    entries,
+    files: Object.fromEntries(entries.map((entry) => {
+      const { name, file } = normalizePoseEntry(entry);
+      return [name, path.join(dir, file)];
+    }))
+  };
+}
+
+function idleSpinSourceConfig() {
+  const dir = path.resolve('asset_sources', 'yuanbao_pose_sources');
+  const entries = Array.from({ length: IDLE_SPIN_KEY_COUNT }, (_, index) => [
+    `idle_spin_${String(index).padStart(2, '0')}`,
+    `yuanbao_idle_spin_key_${String(index).padStart(2, '0')}.png`,
+    'idle_spin'
+  ]);
+  return {
+    dir,
+    sheetPath: path.join(dir, 'generated_idle_spin_sheet_v4.png'),
+    sheetName: 'generated_idle_spin_sheet_v4.png',
+    entries,
+    files: Object.fromEntries(entries.map((entry) => {
+      const { name, file } = normalizePoseEntry(entry);
+      return [name, path.join(dir, file)];
+    }))
+  };
+}
+
+function normalizePoseEntry(entry) {
+  const [name, file, poseKey = name] = entry;
+  return { name, file, poseKey };
+}
+
 const POSES = {
   idle: {
     file: 'yuanbao_custom_eyes_swapped_1779523630440.png',
     maxWidth: 360,
     maxHeight: 405,
     bottomY: 696
+  },
+  idle_yawn: {
+    maxWidth: 360,
+    maxHeight: 405,
+    bottomY: 696
+  },
+  idle_spin: {
+    maxWidth: 430,
+    maxHeight: 415,
+    bottomY: 700
   },
   walk: {
     file: 'yuanbao_walk_pose_1779587530643.png',
@@ -584,6 +674,120 @@ function saveAction(outputDir, actionName, frames) {
   frames.forEach((frame, index) => writePNG(path.join(dir, `frame_${String(index).padStart(3, '0')}.png`), frame));
 }
 
+function importPoseSourceSheetIfAvailable(config = POSE_SOURCE) {
+  if (!fs.existsSync(config.sheetPath)) return false;
+
+  fs.mkdirSync(config.dir, { recursive: true });
+  const keyedSheet = keyGreenScreen(loadSourceImage(config.sheetPath));
+  const cellCount = config.sheetCellCount ?? config.entries.length;
+  const cellWidth = Math.floor(keyedSheet.width / cellCount);
+  const cells = config.entries.map((entry, index) => {
+    const { name, poseKey } = normalizePoseEntry(entry);
+    const width = index === cellCount - 1 ? keyedSheet.width - cellWidth * index : cellWidth;
+    return { name, poseKey, image: crop(keyedSheet, { x: cellWidth * index, y: 0, width, height: keyedSheet.height }) };
+  });
+
+  const sourceManifest = {
+    version: 1,
+    source: config.sheetName,
+    method: 'imagegen multi-action pose sheet imported with local chroma-key removal and per-pose framing',
+    note: 'Photo-marking-priority Yuanbao source poses. Original photos are references only and are not included in the PetPack.',
+    canvas: { width: CANVAS, height: CANVAS },
+    poses: []
+  };
+
+  for (const { name, poseKey, image: cell } of cells) {
+    const pose = POSES[poseKey];
+    if (!pose) fail(`Unknown pose config '${poseKey}' for source '${name}'.`);
+    const isolated = largestAlphaComponent(cell);
+    const box = alphaBBox(isolated);
+    if (!box) fail(`Pose source '${name}' is fully transparent after chroma-key removal.`);
+    const sprite = crop(isolated, box);
+    const scale = Math.min(pose.maxWidth / sprite.width, pose.maxHeight / sprite.height);
+    const fitted = resize(sprite, Math.round(sprite.width * scale), Math.round(sprite.height * scale));
+    const frame = renderFrame(fitted, { bottomY: pose.bottomY });
+    writePNG(config.files[name], frame);
+    sourceManifest.poses.push({ name, poseKey, file: path.basename(config.files[name]) });
+  }
+
+  const manifestName = config === POSE_SOURCE
+    ? 'source_manifest.json'
+    : config === POSE_OVERRIDE_SOURCE
+      ? 'source_manifest_overrides.json'
+      : `source_manifest_${path.basename(config.sheetName, '.png')}.json`;
+  fs.writeFileSync(path.join(config.dir, manifestName), `${JSON.stringify(sourceManifest, null, 2)}\n`);
+  return true;
+}
+
+function largestAlphaComponent(input, threshold = 12) {
+  const total = input.width * input.height;
+  const visited = new Uint8Array(total);
+  let best = [];
+  const queue = [];
+
+  for (let start = 0; start < total; start += 1) {
+    if (visited[start] || input.rgba[start * 4 + 3] <= threshold) continue;
+    const component = [];
+    visited[start] = 1;
+    queue.length = 0;
+    queue.push(start);
+
+    for (let read = 0; read < queue.length; read += 1) {
+      const index = queue[read];
+      component.push(index);
+      const x = index % input.width;
+      const y = Math.floor(index / input.width);
+      const neighbors = [
+        x > 0 ? index - 1 : -1,
+        x + 1 < input.width ? index + 1 : -1,
+        y > 0 ? index - input.width : -1,
+        y + 1 < input.height ? index + input.width : -1
+      ];
+
+      for (const next of neighbors) {
+        if (next < 0 || visited[next] || input.rgba[next * 4 + 3] <= threshold) continue;
+        visited[next] = 1;
+        queue.push(next);
+      }
+    }
+
+    if (component.length > best.length) {
+      best = component;
+    }
+  }
+
+  if (!best.length) return input;
+  const output = image(input.width, input.height);
+  for (const index of best) {
+    const offset = index * 4;
+    input.rgba.copy(output.rgba, offset, offset, offset + 4);
+  }
+  return output;
+}
+
+function loadProjectPoseSources() {
+  if (!Object.values(POSE_SOURCE.files).every((filePath) => fs.existsSync(filePath))) return null;
+  const sprites = {};
+  loadPoseSourceFiles(sprites, POSE_SOURCE, true);
+  loadPoseSourceFiles(sprites, IDLE_VARIANT_SOURCE, false);
+  loadPoseSourceFiles(sprites, IDLE_SPIN_SOURCE, false);
+  return sprites;
+}
+
+function loadPoseSourceFiles(sprites, config, requireAll) {
+  const entries = config.entries.map(normalizePoseEntry);
+  if (requireAll && !entries.every(({ name }) => fs.existsSync(config.files[name]))) return false;
+
+  for (const { name, poseKey } of entries) {
+    const filePath = config.files[name];
+    if (!fs.existsSync(filePath)) continue;
+    const pose = POSES[poseKey];
+    if (!pose) fail(`Unknown pose config '${poseKey}' for source '${name}'.`);
+    sprites[name] = spriteFromFramedSource(loadSourceImage(filePath), pose);
+  }
+  return true;
+}
+
 function importWalkKeyPoseSheetIfAvailable(config) {
   if (!fs.existsSync(config.sheetPath)) return false;
 
@@ -596,9 +800,10 @@ function importWalkKeyPoseSheetIfAvailable(config) {
   });
 
   const trimmed = cells.map((cell, index) => {
-    const box = alphaBBox(cell);
+    const isolated = largestAlphaComponent(cell);
+    const box = alphaBBox(isolated);
     if (!box) fail(`Walk key pose ${index} is fully transparent after chroma-key removal.`);
-    return crop(cell, box);
+    return crop(isolated, box);
   });
 
   const scale = Math.min(
@@ -633,12 +838,12 @@ function loadWalkKeyPoseSources(config) {
   return config.files.map((filePath) => spriteFromFramedSource(loadSourceImage(filePath)));
 }
 
-function spriteFromFramedSource(input) {
+function spriteFromFramedSource(input, pose = POSES.walk) {
   const keyed = keyGreenScreen(input);
   const box = alphaBBox(keyed);
   if (!box) fail('Walk key pose became fully transparent after keying.');
   const cropped = crop(keyed, box);
-  const scale = Math.min(1, POSES.walk.maxWidth / cropped.width, POSES.walk.maxHeight / cropped.height);
+  const scale = Math.min(1, pose.maxWidth / cropped.width, pose.maxHeight / cropped.height);
   return scale < 1 ? resize(cropped, Math.round(cropped.width * scale), Math.round(cropped.height * scale)) : cropped;
 }
 
@@ -670,12 +875,15 @@ function saveDerivedWalkKeyPoseSources(walkSprite, config = WALK_LEFT_SOURCE) {
 
 function buildFrames(sprites) {
   const idle = POSES.idle;
+  const yawn = POSES.idle_yawn;
+  const spin = POSES.idle_spin;
   const walk = POSES.walk;
   const happy = POSES.tap_happy;
   const dragged = POSES.dragged;
   const rest = POSES.rest;
   const walkLeftKeys = sprites.walkLeftKeys?.length ? sprites.walkLeftKeys : [sprites.walk];
   const walkRightKeys = sprites.walkRightKeys?.length ? sprites.walkRightKeys : walkLeftKeys;
+  const spinKeys = Array.from({ length: IDLE_SPIN_KEY_COUNT }, (_, index) => sprites[`idle_spin_${String(index).padStart(2, '0')}`]).filter(Boolean);
 
   const buildWalkFrames = (walkKeys) => Array.from({ length: 12 }, (_, i) => {
     const phase = i / 12;
@@ -700,6 +908,19 @@ function buildFrames(sprites) {
         dy: -Math.max(0, t) * 3
       });
     }),
+    idle_yawn: [
+      renderFrame(sprites.idle, { bottomY: idle.bottomY }),
+      renderFrame(sprites.idle, { bottomY: idle.bottomY, scaleX: 1.01, scaleY: 0.99, dy: 2 }),
+      renderFrame(sprites.idle_yawn, { bottomY: yawn.bottomY, scaleX: 0.99, scaleY: 1.01, dy: -2 }),
+      renderFrame(sprites.idle_yawn, { bottomY: yawn.bottomY, scaleX: 1.0, scaleY: 1.0, dy: -4 }),
+      renderFrame(sprites.idle_yawn, { bottomY: yawn.bottomY, scaleX: 1.01, scaleY: 0.99, dy: -3 }),
+      renderFrame(sprites.idle_yawn, { bottomY: yawn.bottomY, scaleX: 1.0, scaleY: 1.0, dy: -2 }),
+      renderFrame(sprites.idle_yawn, { bottomY: yawn.bottomY, scaleX: 0.99, scaleY: 1.01, dy: -1 }),
+      renderFrame(sprites.idle, { bottomY: idle.bottomY, scaleX: 1.01, scaleY: 0.98, dy: 4 }),
+      renderFrame(sprites.idle, { bottomY: idle.bottomY, scaleX: 0.995, scaleY: 1.005, dy: -1 }),
+      renderFrame(sprites.idle, { bottomY: idle.bottomY })
+    ],
+    idle_spin: spinKeys.map((keySprite) => renderFrame(keySprite, { bottomY: spin.bottomY })),
     walk: buildWalkFrames(walkLeftKeys),
     walk_left: buildWalkFrames(walkLeftKeys),
     walk_right: buildWalkFrames(walkRightKeys),
@@ -738,24 +959,112 @@ function buildFrames(sprites) {
   };
 }
 
+function assertRestFrames(frames) {
+  frames.forEach((frame, index) => {
+    const box = alphaBBox(frame);
+    if (!box) fail(`Rest frame ${index} has no visible pixels.`);
+
+    const darkOpaquePixels = countDarkOpaquePixels(frame);
+    if (darkOpaquePixels < 12000) {
+      fail(`Rest frame ${index} has too few opaque dark marking pixels (${darkOpaquePixels}). Check that back patches were not keyed out.`);
+    }
+
+    const internalTransparentPixels = countInternalTransparentPixels(frame, box);
+    if (internalTransparentPixels > 9000) {
+      fail(`Rest frame ${index} contains a large internal transparent region (${internalTransparentPixels}px). Check for missing body/back patch alpha.`);
+    }
+  });
+}
+
+function countDarkOpaquePixels(input) {
+  let count = 0;
+  for (let i = 0; i < input.rgba.length; i += 4) {
+    const r = input.rgba[i];
+    const g = input.rgba[i + 1];
+    const b = input.rgba[i + 2];
+    const a = input.rgba[i + 3];
+    if (a > 180 && r < 125 && g < 125 && b < 125) count += 1;
+  }
+  return count;
+}
+
+function countInternalTransparentPixels(input, box) {
+  const width = box.width;
+  const height = box.height;
+  const visited = new Uint8Array(width * height);
+  const queue = [];
+
+  const isTransparent = (x, y) => {
+    const offset = ((box.y + y) * input.width + (box.x + x)) * 4;
+    return input.rgba[offset + 3] <= 12;
+  };
+  const enqueue = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const index = y * width + x;
+    if (visited[index] || !isTransparent(x, y)) return;
+    visited[index] = 1;
+    queue.push(index);
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+  for (let y = 0; y < height; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  for (let read = 0; read < queue.length; read += 1) {
+    const index = queue[read];
+    const x = index % width;
+    const y = Math.floor(index / width);
+    enqueue(x - 1, y);
+    enqueue(x + 1, y);
+    enqueue(x, y - 1);
+    enqueue(x, y + 1);
+  }
+
+  let count = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (isTransparent(x, y) && !visited[y * width + x]) count += 1;
+    }
+  }
+  return count;
+}
+
 function main() {
   const sourceDirInput = process.argv[2] || DEFAULT_SOURCE_DIR;
-  if (!sourceDirInput) {
-    fail('Missing source directory. Pass it as the first argument or set YUANBAO_SOURCE_DIR.');
-  }
-  const sourceDir = path.resolve(sourceDirInput);
   const outputDir = path.resolve(process.argv[3] || 'Yuanbao.petpack');
-  if (!fs.existsSync(sourceDir)) fail(`Source directory does not exist: ${sourceDir}`);
+  const sourceDir = sourceDirInput ? path.resolve(sourceDirInput) : null;
+  if (sourceDir && !fs.existsSync(sourceDir)) fail(`Source directory does not exist: ${sourceDir}`);
+  importPoseSourceSheetIfAvailable(POSE_SOURCE);
+  importPoseSourceSheetIfAvailable(POSE_OVERRIDE_SOURCE);
+  importPoseSourceSheetIfAvailable(IDLE_VARIANT_SOURCE);
+  importPoseSourceSheetIfAvailable(IDLE_SPIN_SOURCE);
   importWalkKeyPoseSheetIfAvailable(WALK_LEFT_SOURCE);
   importWalkKeyPoseSheetIfAvailable(WALK_RIGHT_SOURCE);
 
-  const sprites = {};
-  for (const [name, pose] of Object.entries(POSES)) {
-    const filePath = path.join(sourceDir, pose.file);
-    if (!fs.existsSync(filePath)) fail(`Missing pose source: ${filePath}`);
-    sprites[name] = fitSprite(loadSourceImage(filePath), pose.maxWidth, pose.maxHeight);
+  const sprites = loadProjectPoseSources() ?? {};
+  if (!Object.keys(sprites).length) {
+    if (!sourceDir) {
+      fail(`Missing project pose source sheet: ${POSE_SOURCE.sheetPath}`);
+    }
+    for (const [name, pose] of Object.entries(POSES)) {
+      const filePath = path.join(sourceDir, pose.file);
+      if (!fs.existsSync(filePath)) fail(`Missing pose source: ${filePath}`);
+      sprites[name] = fitSprite(loadSourceImage(filePath), pose.maxWidth, pose.maxHeight);
+    }
   }
-  sprites.rest = eraseSleepMarks(sprites.rest);
+  const requiredIdleVariantSources = [
+    'idle_yawn',
+    ...Array.from({ length: IDLE_SPIN_KEY_COUNT }, (_, index) => `idle_spin_${String(index).padStart(2, '0')}`)
+  ];
+  for (const sourceName of requiredIdleVariantSources) {
+    const expectedSheet = sourceName === 'idle_yawn' ? IDLE_VARIANT_SOURCE.sheetPath : IDLE_SPIN_SOURCE.sheetPath;
+    if (!sprites[sourceName]) fail(`Missing idle variant source '${sourceName}'. Expected sheet: ${expectedSheet}`);
+  }
   sprites.walkLeftKeys = loadWalkKeyPoseSources(WALK_LEFT_SOURCE) ?? saveDerivedWalkKeyPoseSources(sprites.walk, WALK_LEFT_SOURCE);
   sprites.walkRightKeys = loadWalkKeyPoseSources(WALK_RIGHT_SOURCE);
   if (!sprites.walkRightKeys) fail(`Missing right walk source sheet: ${WALK_RIGHT_SOURCE.sheetPath}`);
@@ -764,6 +1073,7 @@ function main() {
   fs.rmSync(outputDir, { recursive: true, force: true });
   fs.mkdirSync(outputDir, { recursive: true });
   const frames = buildFrames(sprites);
+  assertRestFrames(frames.rest);
   for (const [actionName, actionFrames] of Object.entries(frames)) {
     saveAction(outputDir, actionName, actionFrames);
   }
@@ -775,11 +1085,13 @@ function main() {
     displayName: '元宝',
     species: 'cat',
     style: 'soft_storybook_multi_pose',
-    version: '0.4.0',
+    version: '0.5.6',
     canvas: { width: CANVAS, height: CANVAS, anchorX: 0.5, anchorY: 0.0 },
     defaultScale: 0.67,
     actions: {
       idle: { path: 'actions/idle', fps: 8, loop: true, required: true, fallback: null },
+      idle_yawn: { path: 'actions/idle_yawn', fps: 8, loop: false, required: false, fallback: 'idle' },
+      idle_spin: { path: 'actions/idle_spin', fps: 8, loop: false, required: false, fallback: 'idle' },
       walk: { path: 'actions/walk', fps: 12, loop: true, required: false, fallback: 'idle' },
       walk_left: { path: 'actions/walk_left', fps: 12, loop: true, required: false, fallback: 'walk' },
       walk_right: { path: 'actions/walk_right', fps: 12, loop: true, required: false, fallback: 'walk' },
@@ -798,11 +1110,11 @@ function main() {
   };
 
   const license = [
-    'Yuanbao PetPack v0.4.0',
+    'Yuanbao PetPack v0.5.6',
     '',
     'Reference photos: provided by the user for this DesktopPet beta.',
-    'Generated pose sources: local AI-generated multi-pose Yuanbao images.',
-    'Walk key pose sources: left and right walk key pose sheets generated from Yuanbao references. Right-facing poses prioritize the user-provided real photo markings.',
+    'Generated pose sources: local AI-generated Yuanbao sheets, using the user-provided real photos as photo-marking references. Idle yawn, idle spin, and rest repair sources are kept outside the PetPack.',
+    'Walk key pose sources: left and right walk key pose sheets generated from Yuanbao references. All current sources prioritize the real photo markings.',
     'Frame process: local Node.js PNG processing, green-screen removal, pose fitting, key-pose sequencing, and light motion pass.',
     'Original photos: not included in this PetPack.',
     'Usage: intended only for local DesktopPet beta testing.',
@@ -814,6 +1126,7 @@ function main() {
   fs.writeFileSync(path.join(outputDir, 'bubbles.json'), `${JSON.stringify(bubbles, null, 2)}\n`);
   fs.writeFileSync(path.join(outputDir, 'license.txt'), license);
   console.log(`Generated: ${outputDir}`);
+  console.log(`Pose sources: ${POSE_SOURCE.dir}`);
   console.log(`Walk left key pose sources: ${WALK_LEFT_SOURCE.dir}`);
   console.log(`Walk right key pose sources: ${WALK_RIGHT_SOURCE.dir}`);
 }

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "source": "generated_idle_variants_rest_sheet_v1.png",
+  "method": "imagegen multi-action pose sheet imported with local chroma-key removal and per-pose framing",
+  "note": "Photo-marking-priority Yuanbao source poses. Original photos are references only and are not included in the PetPack.",
+  "canvas": {
+    "width": 768,
+    "height": 768
+  },
+  "poses": [
+    {
+      "name": "idle_yawn",
+      "poseKey": "idle_yawn",
+      "file": "yuanbao_idle_yawn_source.png"
+    }
+  ]
+}

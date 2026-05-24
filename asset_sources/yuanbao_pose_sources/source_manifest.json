@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "source": "generated_pose_sheet_v2.png",
+  "method": "imagegen multi-action pose sheet imported with local chroma-key removal and per-pose framing",
+  "note": "Photo-marking-priority Yuanbao source poses. Original photos are references only and are not included in the PetPack.",
+  "canvas": {
+    "width": 768,
+    "height": 768
+  },
+  "poses": [
+    {
+      "name": "idle",
+      "poseKey": "idle",
+      "file": "yuanbao_idle_source.png"
+    },
+    {
+      "name": "tap_happy",
+      "poseKey": "tap_happy",
+      "file": "yuanbao_tap_happy_source.png"
+    },
+    {
+      "name": "dragged",
+      "poseKey": "dragged",
+      "file": "yuanbao_dragged_source.png"
+    },
+    {
+      "name": "rest",
+      "poseKey": "rest",
+      "file": "yuanbao_rest_source.png"
+    },
+    {
+      "name": "walk",
+      "poseKey": "walk",
+      "file": "yuanbao_walk_base_source.png"
+    }
+  ]
+}

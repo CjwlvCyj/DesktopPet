@@ -6,6 +6,37 @@ const { pathToFileURL } = require('url');
 
 const { installPetPack, validatePetPack } = require('./petpack');
 const { PetStore } = require('./store');
+const {
+  PetState,
+  SCALE_MIN,
+  SCALE_MAX,
+  SCALE_STEP,
+  DEFAULT_SCALE,
+  DEFAULT_CANVAS_SIZE,
+  WINDOW_MIN_SIZE,
+  WINDOW_MAX_SIZE,
+  WALK_MIN_DISTANCE,
+  WALK_DISTANCE_RANGE,
+  WALK_VERTICAL_RANGE,
+  WALK_ANIMATION_DURATION,
+  AUTO_WALK_MIN_DELAY,
+  AUTO_WALK_DELAY_RANGE,
+  IDLE_VARIANT_MIN_DELAY,
+  IDLE_VARIANT_DELAY_RANGE,
+  IDLE_VARIANT_ACTIONS,
+  DRAG_TIMEOUT,
+  ANIMATION_TICK_MS
+} = require('./constants');
+
+// ---------------------------------------------------------------------------
+// Global error handlers — log to stderr so problems are visible in dev tools
+// ---------------------------------------------------------------------------
+process.on('uncaughtException', (error) => {
+  console.error('[DesktopPet] Uncaught exception:', error);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[DesktopPet] Unhandled rejection:', reason);
+});
 
 let petWindow = null;
 let settingsWindow = null;
@@ -15,8 +46,9 @@ let currentScale = 1;
 let clickThrough = false;
 let alwaysOnTop = true;
 let visible = true;
-let state = 'idle';
+let state = PetState.IDLE;
 let walkTimer = null;
+let idleVariantTimer = null;
 let moveTimer = null;
 let manualDragTimer = null;
 let manualDragSession = null;
@@ -26,12 +58,6 @@ let contentMouseIgnored = false;
 const ROOT = path.resolve(__dirname, '..');
 const DEFAULT_PACK_PATH = path.join(ROOT, 'Resources', 'DefaultPetPack');
 const YUANBAO_PACK_PATH = path.join(ROOT, 'Yuanbao.petpack');
-const SCALE_MIN = 0.35;
-const SCALE_MAX = 1.1;
-const SCALE_STEP = 0.05;
-const WALK_MIN_DISTANCE = 180;
-const WALK_DISTANCE_RANGE = 280;
-const WALK_VERTICAL_RANGE = 120;
 let store;
 
 function preferredInitialPackPath() {
@@ -78,6 +104,7 @@ function createPetWindow() {
     loadPetPack(preferredInitialPackPath());
     petWindow.showInactive();
     scheduleWalk();
+    scheduleIdleVariant();
   });
 
   petWindow.on('moved', () => {
@@ -255,6 +282,7 @@ function updateTrayMenu() {
     { label: '大小...', enabled: !!currentPack, click: toggleSettingsPanel },
     { label: '重置位置', click: resetPosition },
     { type: 'separator' },
+    { label: '动作', enabled: !!currentPack, submenu: buildActionMenu() },
     { label: '休息', click: () => handlePetEvent('restRequested') },
     { label: '使用元宝示例', enabled: fs.existsSync(YUANBAO_PACK_PATH), click: () => loadPetPack(YUANBAO_PACK_PATH) },
     { label: '使用默认宠物', click: () => loadPetPack(DEFAULT_PACK_PATH) },
@@ -264,6 +292,48 @@ function updateTrayMenu() {
     { label: '重新加载窗口', click: () => petWindow?.reload() },
     { label: '退出', click: () => app.quit() }
   ]));
+}
+
+function buildActionMenu() {
+  return [
+    menuSection('待机'),
+    actionMenuItem('静坐', 'idle', { loop: true }),
+    actionMenuItem('绕圈', 'idle_spin'),
+    actionMenuItem('打哈欠', 'idle_yawn'),
+    { type: 'separator' },
+    menuSection('行走'),
+    { label: '随机', enabled: !!currentPack, click: startMenuRandomWalk },
+    {
+      label: '向左',
+      enabled: actionExists('walk_left') || actionExists('walk'),
+      click: () => startDirectedWalk(-1)
+    },
+    {
+      label: '向右',
+      enabled: actionExists('walk_right') || actionExists('walk'),
+      click: () => startDirectedWalk(1)
+    },
+    { type: 'separator' },
+    menuSection('互动'),
+    actionMenuItem('开心跳', 'tap_happy'),
+    actionMenuItem('提起悬空', 'dragged', { loop: true })
+  ];
+}
+
+function menuSection(label) {
+  return { label, enabled: false };
+}
+
+function actionMenuItem(label, actionName, options = {}) {
+  return {
+    label,
+    enabled: actionExists(actionName),
+    click: () => playMenuAction(actionName, options)
+  };
+}
+
+function actionExists(actionName) {
+  return !!currentPack?.manifest?.actions?.[actionName];
 }
 
 function loadPetPack(packPath) {
@@ -279,12 +349,13 @@ function activatePetPack(pack) {
   const previousPackPath = store.get('activePetPackPath');
   currentPack = pack;
   currentScale = getPetScale(pack);
-  state = 'idle';
+  state = PetState.IDLE;
   store.set('activePetPackPath', pack.basePath);
   resizeWindowForPack(pack, { clearVisualOffset: previousPackPath !== pack.basePath });
   sendCurrentPackToRenderer();
   sendSettingsState();
   updateTrayMenu();
+  scheduleIdleVariant();
 }
 
 function sendCurrentPackToRenderer() {
@@ -337,10 +408,12 @@ function toggleVisibility() {
     petWindow.showInactive();
     petWindow.webContents.send('renderer-paused', false);
     scheduleWalk();
+    scheduleIdleVariant();
   } else {
     petWindow.hide();
     petWindow.webContents.send('renderer-paused', true);
     stopWalk();
+    stopIdleVariant();
   }
   updateTrayMenu();
 }
@@ -475,10 +548,10 @@ function resizeWindowForPack(pack, options = {}) {
     x: oldBounds.x + oldBounds.width / 2,
     y: oldBounds.y + oldBounds.height
   };
-  const width = Number(pack.manifest?.canvas?.width) || 768;
-  const height = Number(pack.manifest?.canvas?.height) || 768;
-  const boundedWidth = Math.max(128, Math.min(1400, Math.round(width * currentScale)));
-  const boundedHeight = Math.max(128, Math.min(1400, Math.round(height * currentScale)));
+  const width = Number(pack.manifest?.canvas?.width) || DEFAULT_CANVAS_SIZE;
+  const height = Number(pack.manifest?.canvas?.height) || DEFAULT_CANVAS_SIZE;
+  const boundedWidth = Math.max(WINDOW_MIN_SIZE, Math.min(WINDOW_MAX_SIZE, Math.round(width * currentScale)));
+  const boundedHeight = Math.max(WINDOW_MIN_SIZE, Math.min(WINDOW_MAX_SIZE, Math.round(height * currentScale)));
   petWindow.setContentSize(boundedWidth, boundedHeight, false);
 
   if (preserveBottomCenter) {
@@ -514,7 +587,7 @@ function applyMouseIgnore() {
 }
 
 function defaultScaleForPack(pack) {
-  return clampScale(Number(pack?.manifest?.defaultScale) || 0.67);
+  return clampScale(Number(pack?.manifest?.defaultScale) || DEFAULT_SCALE);
 }
 
 function getPetScale(pack) {
@@ -549,7 +622,7 @@ function resetPetScale() {
 }
 
 function clampScale(value) {
-  const finite = Number.isFinite(value) ? value : 0.67;
+  const finite = Number.isFinite(value) ? value : DEFAULT_SCALE;
   return Math.max(SCALE_MIN, Math.min(SCALE_MAX, Number(finite.toFixed(2))));
 }
 
@@ -558,7 +631,7 @@ function quantizeScale(value) {
 }
 
 function settingsState() {
-  const defaultScale = currentPack ? defaultScaleForPack(currentPack) : 0.67;
+  const defaultScale = currentPack ? defaultScaleForPack(currentPack) : DEFAULT_SCALE;
   return {
     packId: currentPack?.manifest?.id ?? null,
     displayName: currentPack?.manifest?.displayName ?? 'Desktop Pet',
@@ -576,11 +649,75 @@ function sendSettingsState() {
 }
 
 function startWalk(options = {}) {
-  if (!petWindow || !currentPack || !visible || state === 'dragging') return;
-  state = 'walking';
+  if (!petWindow || !currentPack || !visible || state === PetState.DRAGGING) return;
+  state = PetState.WALKING;
   setDragVisualOffset(0, { persist: true });
   if (options.announce) showBubble('walk');
   movePetByRandomStep();
+}
+
+function startDirectedWalk(direction) {
+  if (!petWindow || !currentPack) return;
+  prepareMenuAction();
+  state = PetState.WALKING;
+  setDragVisualOffset(0, { persist: true });
+
+  const bounds = petWindow.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  const frame = display.bounds;
+  const dx = Math.sign(direction || 1) * Math.round(WALK_MIN_DISTANCE + WALK_DISTANCE_RANGE * 0.55);
+  // eslint-disable-next-line no-shadow -- intentional block-scoped `target`
+  const target = clampPositionToFrame(
+    Math.round(bounds.x + dx),
+    bounds.y,
+    bounds,
+    frame
+  );
+
+  playAction(walkActionForDirection(dx), false);
+  animateWindowMove(bounds, target, WALK_ANIMATION_DURATION, () => {
+    state = PetState.IDLE;
+    playAction('idle', false);
+  });
+}
+
+function startMenuRandomWalk() {
+  if (!petWindow || !currentPack) return;
+  prepareMenuAction();
+  startWalk({ announce: true });
+}
+
+function playMenuAction(actionName, options = {}) {
+  if (!petWindow || !currentPack || !actionExists(actionName)) return;
+  prepareMenuAction();
+
+  if (actionName === 'idle') {
+    state = PetState.IDLE;
+    playAction('idle', false);
+    return;
+  }
+
+  const action = currentPack.manifest.actions[actionName];
+  state = PetState.MANUAL_ACTION;
+  const notifyComplete = options.loop ? false : !action.loop;
+  playAction(actionName, notifyComplete);
+}
+
+function prepareMenuAction() {
+  if (!petWindow) return;
+  if (!visible) {
+    visible = true;
+    petWindow.showInactive();
+    petWindow.webContents.send('renderer-paused', false);
+    scheduleWalk();
+    scheduleIdleVariant();
+    updateTrayMenu();
+  }
+
+  clearInterval(moveTimer);
+  moveTimer = null;
+  endManualDrag({ persist: false });
+  setDragVisualOffset(0, { persist: true });
 }
 
 function handlePetEvent(eventName) {
@@ -588,8 +725,8 @@ function handlePetEvent(eventName) {
 
   switch (eventName) {
     case 'petClicked':
-      if (state === 'dragging') return;
-      state = 'tapped';
+      if (state === PetState.DRAGGING) return;
+      state = PetState.TAPPED;
       playAction('tap_happy', true);
       showBubble('tap_happy');
       break;
@@ -598,31 +735,35 @@ function handlePetEvent(eventName) {
       scheduleWalk();
       break;
     case 'dragStarted':
-      state = 'dragging';
+      state = PetState.DRAGGING;
       playAction('dragged', false);
       break;
     case 'dragEnded':
       endManualDrag();
-      state = 'idle';
+      state = PetState.IDLE;
       playAction('idle', false);
       break;
     case 'idleTimerFired':
-      if (state !== 'idle' || !visible) return;
+      if (state !== PetState.IDLE || !visible) return;
       startWalk();
       break;
+    case 'idleVariantTimerFired':
+      if (state !== PetState.IDLE || !visible) return;
+      playIdleVariant();
+      break;
     case 'restRequested':
-      state = state === 'resting' ? 'idle' : 'resting';
-      playAction(state === 'resting' ? 'rest' : 'idle', false);
-      if (state === 'resting') showBubble('rest');
+      state = state === PetState.RESTING ? PetState.IDLE : PetState.RESTING;
+      playAction(state === PetState.RESTING ? 'rest' : 'idle', false);
+      if (state === PetState.RESTING) showBubble('rest');
       break;
     case 'actionCompleted':
-      if (state === 'tapped') {
-        state = 'idle';
+      if (state === PetState.TAPPED || state === PetState.IDLE_VARIANT || state === PetState.MANUAL_ACTION) {
+        state = PetState.IDLE;
         playAction('idle', false);
       }
       break;
     case 'packChanged':
-      state = 'idle';
+      state = PetState.IDLE;
       playAction('idle', false);
       break;
     default:
@@ -657,8 +798,8 @@ function movePetByRandomStep() {
   );
 
   playAction(walkActionForDirection(dx), false);
-  animateWindowMove(bounds, target, 2100, () => {
-    state = 'idle';
+  animateWindowMove(bounds, target, WALK_ANIMATION_DURATION, () => {
+    state = PetState.IDLE;
     playAction('idle', false);
   });
 }
@@ -695,12 +836,12 @@ function beginManualDrag(payload) {
     startedAt: Date.now()
   };
   updateManualDragPosition();
-  manualDragTimer = setInterval(updateManualDragPosition, 16);
+  manualDragTimer = setInterval(updateManualDragPosition, ANIMATION_TICK_MS);
 }
 
 function updateManualDragPosition() {
   if (!petWindow || !manualDragSession) return;
-  if (Date.now() - manualDragSession.startedAt > 30_000) {
+  if (Date.now() - manualDragSession.startedAt > DRAG_TIMEOUT) {
     endManualDrag();
     handlePetEvent('dragEnded');
     return;
@@ -740,6 +881,7 @@ function animateWindowMove(from, to, duration, done) {
   clearInterval(moveTimer);
   const started = Date.now();
   moveTimer = setInterval(() => {
+    // ~60 fps tick for smooth window animation
     const t = Math.min(1, (Date.now() - started) / duration);
     const eased = 0.5 - Math.cos(t * Math.PI) / 2;
     const x = Math.round(from.x + (to.x - from.x) * eased);
@@ -750,13 +892,13 @@ function animateWindowMove(from, to, duration, done) {
       moveTimer = null;
       done?.();
     }
-  }, 16);
+  }, ANIMATION_TICK_MS);
 }
 
 function scheduleWalk() {
   stopWalk();
   if (!visible) return;
-  const delay = 20_000 + Math.random() * 25_000;
+  const delay = AUTO_WALK_MIN_DELAY + Math.random() * AUTO_WALK_DELAY_RANGE;
   walkTimer = setTimeout(() => {
     handlePetEvent('idleTimerFired');
     scheduleWalk();
@@ -766,6 +908,30 @@ function scheduleWalk() {
 function stopWalk() {
   clearTimeout(walkTimer);
   walkTimer = null;
+}
+
+function scheduleIdleVariant() {
+  stopIdleVariant();
+  if (!visible) return;
+  const delay = IDLE_VARIANT_MIN_DELAY + Math.random() * IDLE_VARIANT_DELAY_RANGE;
+  idleVariantTimer = setTimeout(() => {
+    handlePetEvent('idleVariantTimerFired');
+    scheduleIdleVariant();
+  }, delay);
+}
+
+function stopIdleVariant() {
+  clearTimeout(idleVariantTimer);
+  idleVariantTimer = null;
+}
+
+function playIdleVariant() {
+  if (!petWindow || !currentPack) return;
+  const availableActions = IDLE_VARIANT_ACTIONS.filter((actionName) => currentPack.manifest?.actions?.[actionName]);
+  if (!availableActions.length) return;
+  const actionName = availableActions[Math.floor(Math.random() * availableActions.length)];
+  state = PetState.IDLE_VARIANT;
+  playAction(actionName, true);
 }
 
 function setupIPC() {
@@ -797,6 +963,8 @@ app.on('window-all-closed', () => {});
 
 app.on('before-quit', () => {
   stopWalk();
+  stopIdleVariant();
   clearInterval(moveTimer);
   endManualDrag({ persist: false });
+  store?.flush?.();
 });

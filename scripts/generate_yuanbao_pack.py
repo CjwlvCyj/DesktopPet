@@ -1,3 +1,6 @@
+# ⚠️ DEPRECATED: This is the original v1 Yuanbao generator, superseded by
+# generate_yuanbao_petpack_v2.mjs which uses multi-pose sources and
+# more sophisticated image processing. Kept for reference only.
 import os
 import sys
 import math

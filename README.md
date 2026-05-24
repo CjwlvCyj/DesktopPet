@@ -59,8 +59,9 @@ python3 scripts/debug_petpack_preview.py Yuanbao.petpack
 ## 资源包
 
 - `Yuanbao.petpack` 是当前元宝示例包。
-- `asset_sources/yuanbao_walk_keyposes/` 保存元宝左向 walk 的 4 张开发用 key pose 源图；它们不进入 `.petpack` 运行包。
-- `asset_sources/yuanbao_walk_right_keyposes/` 保存元宝右向 walk 的生成 sheet 和 4 张 key pose 源图。
+- `asset_sources/yuanbao_pose_sources/` 保存元宝 idle、tap、dragged、rest、idle_yawn、idle_spin 和 walk base 的照片花色版生成 sheet 与源图；其中 `generated_idle_spin_sheet_v4.png` 提供 10 张原地转圈关键姿态，`generated_dragged_rest_sheet_v1.png` 继续提供完整睡姿源图。
+- `asset_sources/yuanbao_walk_keyposes/` 保存元宝左向 walk 的照片花色版生成 sheet 和 4 张 key pose 源图；左向可见侧保留元宝左眼黑灰斑，它们不进入 `.petpack` 运行包。
+- `asset_sources/yuanbao_walk_right_keyposes/` 保存元宝右向 walk 的生成 sheet 和 4 张 key pose 源图；右向可见侧保持眼周干净。
 - `legacy/backup/` 会保留被生成器覆盖前的旧元宝包备份。
 - `Resources/DefaultPetPack` 是内置默认包。
 - 原始宠物照片不应放入 `.petpack`。app 运行时只需要透明 PNG 动画帧、`manifest.json`、`bubbles.json`、`preview.png` 和 `license.txt`。

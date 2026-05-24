@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "source": "generated_idle_spin_sheet_v4.png",
+  "method": "imagegen multi-action pose sheet imported with local chroma-key removal and per-pose framing",
+  "note": "Photo-marking-priority Yuanbao source poses. Original photos are references only and are not included in the PetPack.",
+  "canvas": {
+    "width": 768,
+    "height": 768
+  },
+  "poses": [
+    {
+      "name": "idle_spin_00",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_00.png"
+    },
+    {
+      "name": "idle_spin_01",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_01.png"
+    },
+    {
+      "name": "idle_spin_02",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_02.png"
+    },
+    {
+      "name": "idle_spin_03",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_03.png"
+    },
+    {
+      "name": "idle_spin_04",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_04.png"
+    },
+    {
+      "name": "idle_spin_05",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_05.png"
+    },
+    {
+      "name": "idle_spin_06",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_06.png"
+    },
+    {
+      "name": "idle_spin_07",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_07.png"
+    },
+    {
+      "name": "idle_spin_08",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_08.png"
+    },
+    {
+      "name": "idle_spin_09",
+      "poseKey": "idle_spin",
+      "file": "yuanbao_idle_spin_key_09.png"
+    }
+  ]
+}

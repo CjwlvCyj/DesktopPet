@@ -18,6 +18,9 @@ let mouseIgnored = false;
 let currentScale = 1;
 let dragVisualOffsetY = 0;
 const boundsCache = new Map();
+const PASSIVE_FPS_CAPS = {
+  idle: 4
+};
 
 function currentAction() {
   return pack?.actions?.[currentActionName] || pack?.actions?.idle;
@@ -30,7 +33,7 @@ function currentFrames() {
 function resolveAction(name) {
   if (!pack) return 'idle';
   if (pack.actions[name]) return name;
-  const fallback = pack.actions[name]?.fallback;
+  const fallback = pack.manifest?.actions?.[name]?.fallback;
   if (fallback && pack.actions[fallback]) return fallback;
   return 'idle';
 }
@@ -76,6 +79,7 @@ function scheduleNextFrame() {
   if (paused) return;
   const action = currentAction();
   if (!action) return;
+  const fps = Math.max(1, Math.min(action.fps, PASSIVE_FPS_CAPS[currentActionName] ?? action.fps));
   animationTimer = setTimeout(() => {
     const frames = currentFrames();
     const next = frameIndex + 1;
@@ -91,7 +95,7 @@ function scheduleNextFrame() {
     }
     drawFrame();
     scheduleNextFrame();
-  }, 1000 / action.fps);
+  }, 1000 / fps);
 }
 
 function updateBoundsFromImage(source) {
@@ -257,6 +261,14 @@ window.addEventListener('pointermove', (event) => {
   }
 });
 
+function resetPointerState(event) {
+  releasePointer(event);
+  dragStart = null;
+  dragWindow = null;
+  dragging = false;
+  pointerButton = 0;
+}
+
 window.addEventListener('pointerup', (event) => {
   if (!dragStart) return;
   if (dragging) {
@@ -267,11 +279,7 @@ window.addEventListener('pointerup', (event) => {
   } else {
     window.desktopPet.sendPetEvent('petClicked');
   }
-  releasePointer(event);
-  dragStart = null;
-  dragWindow = null;
-  dragging = false;
-  pointerButton = 0;
+  resetPointerState(event);
 });
 
 window.addEventListener('pointercancel', (event) => {
@@ -279,11 +287,7 @@ window.addEventListener('pointercancel', (event) => {
     window.desktopPet.endDrag();
     window.desktopPet.sendPetEvent('dragEnded');
   }
-  releasePointer(event);
-  dragStart = null;
-  dragWindow = null;
-  dragging = false;
-  pointerButton = 0;
+  resetPointerState(event);
 });
 
 window.addEventListener('pointerleave', () => {

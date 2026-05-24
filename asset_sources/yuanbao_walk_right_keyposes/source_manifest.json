@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "source": "generated_walk_right_sheet_v1.png",
+  "source": "generated_walk_right_sheet_v2.png",
   "direction": "right",
   "method": "imagegen walk-cycle sprite sheet imported with local chroma-key removal and per-pose framing",
   "note": "Four true right-facing walking key poses for Yuanbao. The generated sheet is preserved so the key poses can be regenerated.",

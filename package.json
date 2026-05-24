@@ -11,7 +11,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/petpack.js && node --check electron/store.js && node --check electron/renderer/renderer.js && node --check electron/settings/settings.js && node --check scripts/validate_petpack.mjs && node --check scripts/analyze_petpack_assets.mjs && node --check scripts/generate_yuanbao_petpack_v2.mjs",
+    "check": "node --check electron/main.js && node --check electron/preload.js && node --check electron/petpack.js && node --check electron/store.js && node --check electron/constants.js && node --check electron/renderer/renderer.js && node --check electron/settings/settings.js && node --check scripts/validate_petpack.mjs && node --check scripts/analyze_petpack_assets.mjs && node --check scripts/generate_yuanbao_petpack_v2.mjs",
     "validate": "node scripts/validate_petpack.mjs Yuanbao.petpack && node scripts/validate_petpack.mjs Resources/DefaultPetPack",
     "analyze:yuanbao": "node scripts/analyze_petpack_assets.mjs Yuanbao.petpack",
     "generate:yuanbao": "node scripts/generate_yuanbao_petpack_v2.mjs",

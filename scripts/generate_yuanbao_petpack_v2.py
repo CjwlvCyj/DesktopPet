@@ -1,3 +1,6 @@
+# ⚠️ DEPRECATED: This script is superseded by generate_yuanbao_petpack_v2.mjs
+# which has more sophisticated processing (soft alpha matte, connected-component
+# isolation, bilinear interpolation, walk cycle warping). Kept for reference only.
 import os
 import sys
 import json
@@ -145,13 +148,12 @@ def main():
       "actions": {
         "idle": { "path": "actions/idle", "fps": 8, "loop": True, "required": True, "fallback": None },
         "walk": { "path": "actions/walk", "fps": 10, "loop": True, "required": False, "fallback": "idle" },
-        "tap_happy": { "path": "actions/tap_happy", "fps": 12, "loop": false, "required": false, "fallback": "idle" },
+        "tap_happy": { "path": "actions/tap_happy", "fps": 12, "loop": False, "required": False, "fallback": "idle" },
         "dragged": { "path": "actions/dragged", "fps": 8, "loop": True, "required": False, "fallback": "idle" },
         "rest": { "path": "actions/rest", "fps": 4, "loop": True, "required": False, "fallback": "idle" }
       }
     }
-    # Note: loop in JSON manifest should be standard boolean lowercase
-    manifest["actions"]["tap_happy"]["loop"] = False # Fix the key capitalization
+
     
     with open(os.path.join(out_dir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
