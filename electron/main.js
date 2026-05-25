@@ -141,26 +141,20 @@ function createSettingsWindow() {
 }
 
 function createTray() {
-  tray = new Tray(createTrayIcon());
+  const trayIcon = createTrayIcon();
+  tray = new Tray(trayIcon);
   tray.setToolTip('Desktop Pet');
+  if (trayIcon.isEmpty()) {
+    tray.setTitle('Pet');
+  }
   updateTrayMenu();
 }
 
 function createTrayIcon() {
   const iconSize = 16;
-
-  if (process.platform === 'darwin') {
-    const systemPaw = nativeImage.createFromNamedImage('pawprint.fill');
-    if (!systemPaw.isEmpty()) {
-      const resized = systemPaw.resize({ width: iconSize, height: iconSize, quality: 'best' });
-      resized.setTemplateImage(true);
-      return resized;
-    }
-  }
-
-  const fallbackPaw = nativeImage.createFromBuffer(createPawTemplatePNG(iconSize * 2), { scaleFactor: 2 });
-  fallbackPaw.setTemplateImage(true);
-  return fallbackPaw;
+  const paw = nativeImage.createFromBuffer(createPawTemplatePNG(iconSize * 2), { scaleFactor: 2 });
+  paw.setTemplateImage(true);
+  return paw;
 }
 
 function createPawTemplatePNG(size = 32) {
